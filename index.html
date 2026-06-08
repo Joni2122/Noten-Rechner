@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Noten Tabelle</title>
+<title>Noten Cloud</title>
 
 <style>
 body{
@@ -15,21 +15,17 @@ body{
 
 h1{text-align:center;}
 
-table{
-  width:100%;
-  border-collapse: collapse;
-  margin-top:20px;
+.container{
+  max-width:900px;
+  margin:auto;
+}
+
+.admin{
+  display:none;
   background:#1e293b;
-}
-
-th,td{
-  border:1px solid #334155;
-  padding:10px;
-  text-align:center;
-}
-
-th{
-  background:#0ea5e9;
+  padding:15px;
+  border-radius:10px;
+  margin-bottom:20px;
 }
 
 input,select,button{
@@ -45,28 +41,39 @@ button{
 }
 button:hover{background:#0ea5e9;}
 
-.admin{
-  display:none;
+table{
+  width:100%;
+  border-collapse: collapse;
   background:#1e293b;
-  padding:15px;
-  border-radius:10px;
-  margin-bottom:15px;
+}
+
+th,td{
+  border:1px solid #334155;
+  padding:10px;
+  text-align:center;
+}
+
+th{
+  background:#0ea5e9;
 }
 </style>
 </head>
 
 <body>
 
-<h1>📚 Noten Tabelle</h1>
+<h1>📚 Noten Cloud App</h1>
 
+<div class="container">
+
+<!-- 🔐 ADMIN -->
 <div id="adminPanel" class="admin">
-  <h3>🔐 Admin</h3>
+  <h3>Admin Mode</h3>
 
   <input id="subject" placeholder="Fach">
 
   <select id="semester">
-    <option value="1">HJ1</option>
-    <option value="2">HJ2</option>
+    <option value="1">Halbjahr 1</option>
+    <option value="2">Halbjahr 2</option>
   </select>
 
   <select id="type">
@@ -77,88 +84,100 @@ button:hover{background:#0ea5e9;}
 
   <input id="grade" type="number" step="0.1" placeholder="Note">
 
-  <button onclick="add()">Hinzufügen</button>
+  <button onclick="addGrade()">Hinzufügen</button>
 </div>
 
 <table>
-  <thead>
-    <tr>
-      <th>Fach</th>
-      <th>HJ1</th>
-      <th>HJ2</th>
-      <th>Ø Fach</th>
-    </tr>
-  </thead>
-  <tbody id="body"></tbody>
+<thead>
+<tr>
+  <th>Fach</th>
+  <th>HJ1</th>
+  <th>HJ2</th>
+  <th>Ø</th>
+</tr>
+</thead>
+<tbody id="body"></tbody>
 </table>
 
+</div>
+
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-// 🔥 Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyAdC2nb71oeF9XtasVpUnmJot0ZqaODSaQ",
-  authDomain: "noten-fc7d8.firebaseapp.com",
-  databaseURL: "https://noten-fc7d8-default-rtdb.firebaseio.com",
-  projectId: "noten-fc7d8",
-  storageBucket: "noten-fc7d8.firebasestorage.app",
-  messagingSenderId: "429440294646",
-  appId: "1:429440294646:web:1db4b5690f10ea722b56d7"
-};
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+// 🔥 SUPABASE VERBINDUNG
+const supabase = createClient(
+  "https://qrtnqwfcarwvxfljkqon.supabase.co",
+  "sb_publishable_j7O7k3fTxwF5_LzTUjrt4w_dzW1ruuv"
+);
 
-// 🔐 Admin Mode
+// 🔐 ADMIN (?admin=1)
 const isAdmin = new URLSearchParams(location.search).get("admin") === "1";
 if(isAdmin) document.getElementById("adminPanel").style.display = "block";
 
-// 📦 Daten
-let data = {};
+// 📦 DATEN
+let data = [];
 
-// 📥 Load
-onValue(ref(db,"grades"), snap=>{
-  data = snap.val() || {};
+// 📥 LOAD
+async function load(){
+  const { data: result, error } = await supabase
+    .from("grades")
+    .select("*");
+
+  if(error){
+    console.log("LOAD ERROR:", error);
+    return;
+  }
+
+  data = result || [];
   render();
-});
+}
 
-// ➕ Add Note
-window.add = function(){
+load();
+
+// ➕ ADD NOTE
+window.addGrade = async function(){
+
   if(!isAdmin) return;
 
   const subject = document.getElementById("subject").value;
-  const semester = document.getElementById("semester").value;
+  const semester = parseInt(document.getElementById("semester").value);
   const type = document.getElementById("type").value;
   const grade = parseFloat(document.getElementById("grade").value);
 
   if(!subject || isNaN(grade)) return;
 
-  if(!data[subject]){
-    data[subject] = {1:[],2:[]};
+  const { error } = await supabase
+    .from("grades")
+    .insert({
+      subject,
+      semester,
+      type,
+      grade
+    });
+
+  if(error){
+    console.log("INSERT ERROR:", error);
   }
 
-  data[subject][semester].push({type,grade});
-
-  set(ref(db,"grades"), data);
+  load();
 };
 
-// 📊 Gewichtung
+// 📊 BERECHNUNG
 function calc(list, subject){
-
-  if(!list.length) return null;
 
   const is50 = ["Geo","Bio","Reli","Gemeinschaftskunde","Musik"].includes(subject);
 
-  let sum=0;
-  let w=0;
+  let sum = 0;
+  let w = 0;
 
-  list.forEach(n=>{
+  list.forEach(n => {
+
     let weight;
 
-    if(n.type==="oral"){
+    if(n.type === "oral"){
       weight = is50 ? 0.5 : 0.4;
-    }else{
+    } else {
       weight = is50 ? 0.5 : 0.6;
     }
 
@@ -166,33 +185,39 @@ function calc(list, subject){
     w += weight;
   });
 
-  return w ? (sum/w) : null;
+  return w ? (sum / w).toFixed(2) : "-";
 }
 
-// 📊 Render Tabelle
+// 📊 RENDER
 function render(){
 
   const body = document.getElementById("body");
-  body.innerHTML="";
+  body.innerHTML = "";
 
-  Object.keys(data).forEach(sub=>{
+  const subjects = [...new Set(data.map(d => d.subject))];
 
-    const hj1 = calc(data[sub][1]||[],sub);
-    const hj2 = calc(data[sub][2]||[],sub);
+  subjects.forEach(sub => {
 
-    let arr = [hj1,hj2].filter(x=>x!==null);
-    let avg = arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2) : "-";
+    const h1 = data.filter(d => d.subject === sub && d.semester === 1);
+    const h2 = data.filter(d => d.subject === sub && d.semester === 2);
+
+    const avg1 = calc(h1, sub);
+    const avg2 = calc(h2, sub);
+
+    const both = [parseFloat(avg1), parseFloat(avg2)].filter(x => !isNaN(x));
+    const total = both.length ? (both.reduce((a,b)=>a+b,0)/both.length).toFixed(2) : "-";
 
     body.innerHTML += `
       <tr>
         <td>${sub}</td>
-        <td>${hj1 ?? "-"}</td>
-        <td>${hj2 ?? "-"}</td>
-        <td><b>${avg}</b></td>
+        <td>${avg1}</td>
+        <td>${avg2}</td>
+        <td><b>${total}</b></td>
       </tr>
     `;
   });
 }
+
 </script>
 
 </body>
