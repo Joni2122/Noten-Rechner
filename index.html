@@ -15,15 +15,14 @@ body{
 
 h1{
   text-align:center;
-  margin-bottom:20px;
   color:#38bdf8;
 }
 
 table{
   width:100%;
   border-collapse:collapse;
-  background:rgba(30,41,59,0.9);
-  border-radius:12px;
+  background:#1e293b;
+  border-radius:10px;
   overflow:hidden;
 }
 
@@ -46,11 +45,6 @@ input{
   text-align:center;
 }
 
-.subject{
-  font-weight:bold;
-  background:#111827;
-}
-
 .avg{
   font-weight:bold;
   color:#38bdf8;
@@ -66,7 +60,6 @@ input{
 <thead>
 <tr>
   <th>Fach</th>
-
   <th>KA1</th>
   <th>KA2</th>
   <th>KA3</th>
@@ -107,7 +100,6 @@ const subjects = [
 
 let data = [];
 
-// 📥 LOAD
 async function load(){
   const { data: res } = await supabase.from("grades").select("*");
   data = res || [];
@@ -116,12 +108,10 @@ async function load(){
 
 load();
 
-// 🔍 GET
 function get(subject, semester){
-  return data.find(d => d.subject === subject && d.semester === semester);
+  return data.find(d => d.subject === subject && d.semester === semester) || {};
 }
 
-// 🧮 BERECHNUNG
 function calc(e){
 
   if(!e) return "-";
@@ -142,7 +132,6 @@ function calc(e){
   return w ? (sum/w).toFixed(2) : "-";
 }
 
-// 💾 SAVE
 async function save(subject, semester, field, value){
 
   let entry = data.find(d => d.subject === subject && d.semester === semester);
@@ -154,10 +143,11 @@ async function save(subject, semester, field, value){
 
   entry[field] = value === "" ? null : parseFloat(value);
 
-  await supabase.from("grades").upsert(entry);
+  await supabase.from("grades").upsert(entry, {
+    onConflict: "subject,semester"
+  });
 }
 
-// 📊 RENDER
 function render(){
 
   const body = document.getElementById("body");
@@ -165,12 +155,12 @@ function render(){
 
   subjects.forEach(sub => {
 
-    const h1 = get(sub,1) || {};
-    const h2 = get(sub,2) || {};
+    const h1 = get(sub,1);
+    const h2 = get(sub,2);
 
     body.innerHTML += `
       <tr>
-        <td class="subject">${sub}</td>
+        <td>${sub}</td>
 
         ${cell(sub,1,"exam1",h1.exam1)}
         ${cell(sub,1,"exam2",h1.exam2)}
@@ -178,7 +168,6 @@ function render(){
         ${cell(sub,1,"test1",h1.test1)}
         ${cell(sub,1,"test2",h1.test2)}
         ${cell(sub,1,"oral",h1.oral)}
-
         <td class="avg">${calc(h1)}</td>
 
         ${cell(sub,2,"exam1",h2.exam1)}
@@ -187,7 +176,6 @@ function render(){
         ${cell(sub,2,"test1",h2.test1)}
         ${cell(sub,2,"test2",h2.test2)}
         ${cell(sub,2,"oral",h2.oral)}
-
         <td class="avg">${calc(h2)}</td>
 
         <td class="avg">${avg(calc(h1),calc(h2))}</td>
@@ -196,9 +184,7 @@ function render(){
   });
 }
 
-// 🧩 CELL INPUT
 function cell(subject, semester, field, value){
-
   return `
     <td>
       <input value="${value ?? ""}"
@@ -207,14 +193,12 @@ function cell(subject, semester, field, value){
   `;
 }
 
-// 📊 TOTAL
 function avg(a,b){
-  let arr = [parseFloat(a), parseFloat(b)].filter(x=>!isNaN(x));
+  let arr = [parseFloat(a),parseFloat(b)].filter(x=>!isNaN(x));
   if(!arr.length) return "-";
   return (arr.reduce((x,y)=>x+y)/arr.length).toFixed(2);
 }
 
-// 🌐 GLOBAL UPDATE
 window.update = async function(subject, semester, field, value){
   await save(subject, semester, field, value);
 };
