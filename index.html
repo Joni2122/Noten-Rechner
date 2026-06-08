@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Noten Rechner</title>
+<title>Noten System</title>
 
-<!-- FIREBASE IMPORT -->
+<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
 <style>
 body{
-    font-family: Arial;
     background:#111;
     color:white;
-    margin:20px;
+    font-family:Arial;
+    margin:10px;
 }
 
 h1{
@@ -24,44 +24,42 @@ h1{
 table{
     width:100%;
     border-collapse:collapse;
-    margin-top:20px;
+    margin-bottom:30px;
 }
 
 th,td{
     border:1px solid #333;
-    padding:10px;
+    padding:6px;
     text-align:center;
 }
 
 input{
-    width:60px;
-    font-size:16px;
+    width:45px;
+    text-align:center;
+    background:#1a1a1a;
+    color:white;
+    border:1px solid #444;
+}
+
+.section{
+    margin-top:20px;
+    font-weight:bold;
+    color:#4dd0ff;
 }
 </style>
 </head>
 
 <body>
 
-<h1>📊 Noten Rechner</h1>
+<h1>📊 Noten System</h1>
 
-<table>
-<thead>
-<tr>
-<th>Fach</th>
-<th>Note</th>
-</tr>
-</thead>
-
-<tbody id="tableBody"></tbody>
-</table>
+<div id="container"></div>
 
 <script>
 
 ////////////////////////////////////////////////////
-// 🔥 HIER KOMMT DEINE FIREBASE CONFIG REIN
-// (DEN BLOCK AUS FIREBASE EINFÜGEN)
+// 🔥 FIREBASE CONFIG HIER EINSETZEN
 ////////////////////////////////////////////////////
-
 const firebaseConfig = {
   // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
@@ -93,67 +91,163 @@ const db = firebase.firestore();
 ////////////////////////////////////////////////////
 
 const faecher = [
-"Mathe",
-"Deutsch",
-"Englisch",
-"Bio",
-"Geo",
-"Musik",
-"Religion",
-"Sport"
+{
+name:"Mathe",
+type:"60/40"
+},
+{
+name:"Deutsch",
+type:"60/40"
+},
+{
+name:"Englisch",
+type:"60/40"
+},
+{
+name:"Bio",
+type:"50/50"
+},
+{
+name:"Geo",
+type:"50/50"
+},
+{
+name:"Musik",
+type:"50/50"
+},
+{
+name:"Sport",
+type:"60/40"
+}
 ];
 
-const tableBody = document.getElementById("tableBody");
+const container = document.getElementById("container");
 
-// Tabelle erstellen
-faecher.forEach((fach, i) => {
+// Tabellen bauen
+faecher.forEach((fach,i)=>{
 
-const row = document.createElement("tr");
+const div = document.createElement("div");
 
-row.innerHTML = `
-<td>${fach}</td>
-<td><input type="number" min="1" max="6" id="note${i}"></td>
+div.innerHTML = `
+<div class="section">${fach.name} (${fach.type})</div>
+
+<table>
+<tr>
+<th>Test 1</th>
+<th>Test 2</th>
+<th>Test 3</th>
+<th>KA 1</th>
+<th>KA 2</th>
+<th>Mündlich</th>
+<th>Ø</th>
+</tr>
+
+<tr>
+<td><input id="t1_${i}" type="number"></td>
+<td><input id="t2_${i}" type="number"></td>
+<td><input id="t3_${i}" type="number"></td>
+<td><input id="k1_${i}" type="number"></td>
+<td><input id="k2_${i}" type="number"></td>
+<td><input id="m_${i}" type="number"></td>
+<td id="avg_${i}">-</td>
+</tr>
+</table>
 `;
 
-tableBody.appendChild(row);
+container.appendChild(div);
 
 });
+
+// Berechnung
+function calc(i){
+
+let t1 = parseFloat(document.getElementById("t1_"+i).value)||0;
+let t2 = parseFloat(document.getElementById("t2_"+i).value)||0;
+let t3 = parseFloat(document.getElementById("t3_"+i).value)||0;
+
+let k1 = parseFloat(document.getElementById("k1_"+i).value)||0;
+let k2 = parseFloat(document.getElementById("k2_"+i).value)||0;
+
+let m = parseFloat(document.getElementById("m_"+i).value)||0;
+
+// Tests: 4 Tests = 1 KA
+let testAvg = (t1+t2+t3)/3;
+
+// KA Schnitt
+let kaAvg = (k1+k2)/2;
+
+// alles zusammen
+let weightedTests = testAvg / 4;
+
+let result = (weightedTests + kaAvg + m)/3;
+
+document.getElementById("avg_"+i).innerText = result.toFixed(2);
+
+return result;
+}
 
 // speichern
-function speichern(){
+function save(){
 
-let daten = {};
+let data = {};
 
-faecher.forEach((fach, i) => {
-daten[fach] = document.getElementById("note"+i).value;
+faecher.forEach((f,i)=>{
+
+data[f.name] = {
+t1: document.getElementById("t1_"+i).value,
+t2: document.getElementById("t2_"+i).value,
+t3: document.getElementById("t3_"+i).value,
+k1: document.getElementById("k1_"+i).value,
+k2: document.getElementById("k2_"+i).value,
+m: document.getElementById("m_"+i).value
+};
+
 });
 
-db.collection("noten").doc("user1").set(daten);
+db.collection("noten").doc("user1").set(data);
 
 }
 
 // laden
-async function laden(){
+async function load(){
 
 const doc = await db.collection("noten").doc("user1").get();
 
 if(doc.exists){
-const daten = doc.data();
+const data = doc.data();
 
-faecher.forEach((fach, i) => {
-if(daten[fach]){
-document.getElementById("note"+i).value = daten[fach];
+faecher.forEach((f,i)=>{
+
+if(data[f.name]){
+
+document.getElementById("t1_"+i).value = data[f.name].t1;
+document.getElementById("t2_"+i).value = data[f.name].t2;
+document.getElementById("t3_"+i).value = data[f.name].t3;
+document.getElementById("k1_"+i).value = data[f.name].k1;
+document.getElementById("k2_"+i).value = data[f.name].k2;
+document.getElementById("m_"+i).value = data[f.name].m;
+
+calc(i);
 }
+
 });
 
 }
 
 }
 
-// automatisch speichern
-document.addEventListener("input", speichern);
+// input events
+document.addEventListener("input", ()=>{
 
-laden();
+faecher.forEach((_,i)=>{
+calc(i);
+});
+
+save();
+
+});
+
+load();
 
 </script>
 
