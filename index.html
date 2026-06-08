@@ -3,91 +3,110 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Noten System</title>
+<title>Noten Dashboard</title>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
 <style>
+
+/* 🌈 NEUES MODERNES DESIGN */
 body{
     margin:0;
     font-family: Arial;
-    background: #0a0f1c;
+    background: radial-gradient(circle at top,#1e293b,#0b1020);
     color:white;
 }
 
-/* TOP BAR */
-.topbar{
-    background: linear-gradient(90deg,#1e293b,#0f172a);
-    padding:15px;
-    font-size:20px;
+/* HEADER */
+.header{
+    padding:18px;
+    font-size:22px;
     font-weight:bold;
     display:flex;
     justify-content:space-between;
+    background:#0f172a;
+    border-bottom:1px solid #1f2937;
 }
 
-/* BADGE */
-.badge{
-    color:#4ade80;
-}
-
-/* LAYOUT */
-.container{
+/* GRID */
+.grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit,minmax(280px,1fr));
+    gap:15px;
     padding:15px;
 }
 
 /* CARD */
 .card{
     background:#111827;
-    margin:15px 0;
-    padding:15px;
-    border-radius:12px;
-    border:1px solid #1f2937;
+    border-radius:16px;
+    padding:12px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.4);
 }
 
-/* TITLE */
 .title{
     font-size:18px;
     margin-bottom:10px;
     color:#60a5fa;
 }
 
-/* TABLE */
-table{
-    width:100%;
-    border-collapse:collapse;
+/* INPUT GRID */
+.row{
+    display:grid;
+    grid-template-columns: repeat(6,1fr);
+    gap:5px;
 }
 
-th,td{
-    border:1px solid #374151;
-    padding:6px;
-    text-align:center;
-}
-
+/* INPUTS */
 input{
-    width:55px;
-    padding:4px;
-    background:#0f172a;
-    border:1px solid #334155;
-    color:white;
+    width:100%;
+    padding:6px;
+    border-radius:8px;
+    border:none;
     text-align:center;
+    background:#0f172a;
+    color:white;
+    font-size:14px;
 }
 
+/* AVG */
 .avg{
-    color:#34d399;
+    margin-top:8px;
     font-weight:bold;
+    color:#34d399;
 }
+
+/* BUTTON */
+button{
+    margin:10px;
+    padding:10px 14px;
+    border:none;
+    border-radius:10px;
+    background:#2563eb;
+    color:white;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#1d4ed8;
+}
+
 </style>
 </head>
 
 <body>
 
-<div class="topbar">
+<div class="header">
 📊 Noten System
 <div id="mode"></div>
 </div>
 
-<div class="container" id="app"></div>
+<div id="app" class="grid"></div>
+
+<div style="text-align:center;">
+<button id="saveBtn" style="display:none;">💾 Speichern</button>
+</div>
 
 <script>
 
@@ -110,20 +129,26 @@ const db = firebase.firestore();
 
 ////////////////////////////////////////////////////
 
-// ADMIN MODE
-const isAdmin = new URLSearchParams(window.location.search).has("admin");
+// ADMIN CHECK
+const isAdmin = new URLSearchParams(location.search).has("admin");
 
-document.getElementById("mode").innerText = isAdmin ? "ADMIN" : "VIEW";
+document.getElementById("mode").innerText =
+isAdmin ? "ADMIN MODE" : "VIEW MODE";
 
-// Fächer
-const subjects = ["Mathe","Deutsch","Englisch","Bio","Geo","Musik","Religion","Sport"];
+if(isAdmin){
+document.getElementById("saveBtn").style.display="inline-block";
+}
+
+const subjects = [
+"Mathe","Deutsch","Englisch","Bio","Geo","Musik","Religion","Sport"
+];
 
 const app = document.getElementById("app");
 
-// Daten speichern lokal im Speicher
+// DATA CACHE
 let cache = {};
 
-// UI bauen
+// UI
 subjects.forEach((s,i)=>{
 
 const card = document.createElement("div");
@@ -132,119 +157,114 @@ card.className="card";
 card.innerHTML = `
 <div class="title">${s}</div>
 
-<table>
-<tr>
-<th>T1</th><th>T2</th><th>T3</th>
-<th>KA1</th><th>KA2</th>
-<th>M</th>
-<th>Ø</th>
-</tr>
+<div class="row">
+<input id="t1_${i}" placeholder="T1">
+<input id="t2_${i}" placeholder="T2">
+<input id="t3_${i}" placeholder="T3">
+<input id="k1_${i}" placeholder="KA1">
+<input id="k2_${i}" placeholder="KA2">
+<input id="m_${i}" placeholder="M">
+</div>
 
-<tr>
-<td><input id="t1_${i}"></td>
-<td><input id="t2_${i}"></td>
-<td><input id="t3_${i}"></td>
-<td><input id="k1_${i}"></td>
-<td><input id="k2_${i}"></td>
-<td><input id="m_${i}"></td>
-<td class="avg" id="avg_${i}">-</td>
-</tr>
-</table>
+<div class="avg" id="avg_${i}">Ø: -</div>
 `;
 
 app.appendChild(card);
 
 });
 
-// CALC
+// 🧮 NEUE BERECHNUNG (STABIL)
 function calc(i){
 
-let t1=+document.getElementById("t1_"+i).value||0;
-let t2=+document.getElementById("t2_"+i).value||0;
-let t3=+document.getElementById("t3_"+i).value||0;
+let t1=+val("t1_"+i);
+let t2=+val("t2_"+i);
+let t3=+val("t3_"+i);
 
-let k1=+document.getElementById("k1_"+i).value||0;
-let k2=+document.getElementById("k2_"+i).value||0;
+let k1=+val("k1_"+i);
+let k2=+val("k2_"+i);
 
-let m=+document.getElementById("m_"+i).value||0;
+let m=+val("m_"+i);
 
-let test=(t1+t2+t3)/3;
-let ka=(k1+k2)/2;
+// Tests → 4 = 1 KA
+let testAvg=(t1+t2+t3)/3;
+let testWeight=testAvg/4;
 
-let result=(test/4 + ka + m)/3;
+let kaAvg=(k1+k2)/2;
 
-document.getElementById("avg_"+i).innerText=result.toFixed(2);
+// Gesamt
+let result=(testWeight+kaAvg+m)/3;
 
-return result;
+document.getElementById("avg_"+i).innerText="Ø: "+result.toFixed(2);
+
+cache[i]=result;
 }
 
-// SAVE
-function save(){
+function val(id){
+return document.getElementById(id).value||0;
+}
+
+// 💾 SAVE BUTTON (NUR ADMIN)
+document.getElementById("saveBtn").onclick=async()=>{
 
 let data={};
 
 subjects.forEach((s,i)=>{
 
 data[s]={
-t1:t1v(i),t2:t2v(i),t3:t3v(i),
-k1:k1v(i),k2:k2v(i),
-m:mv(i)
+t1:val("t1_"+i),
+t2:val("t2_"+i),
+t3:val("t3_"+i),
+k1:val("k1_"+i),
+k2:val("k2_"+i),
+m:val("m_"+i)
 };
 
 });
 
-db.collection("noten").doc("user").set(data);
-}
+await db.collection("noten").doc("user").set(data);
 
-// helpers
-const t1v=i=>document.getElementById("t1_"+i).value;
-const t2v=i=>document.getElementById("t2_"+i).value;
-const t3v=i=>document.getElementById("t3_"+i).value;
-const k1v=i=>document.getElementById("k1_"+i).value;
-const k2v=i=>document.getElementById("k2_"+i).value;
-const mv=i=>document.getElementById("m_"+i).value;
+alert("Gespeichert ✔");
+};
 
-// 🔥 REALTIME FIX (WICHTIGSTE VERBESSERUNG)
-db.collection("noten").doc("user")
-.onSnapshot(doc=>{
+// 📥 LOAD
+async function load(){
 
-if(!doc.exists) return;
+const doc=await db.collection("noten").doc("user").get();
+
+if(!doc.exists)return;
 
 let data=doc.data();
 
 subjects.forEach((s,i)=>{
 
-if(!data[s]) return;
+if(!data[s])return;
 
-document.getElementById("t1_"+i).value=data[s].t1||"";
-document.getElementById("t2_"+i).value=data[s].t2||"";
-document.getElementById("t3_"+i).value=data[s].t3||"";
-document.getElementById("k1_"+i).value=data[s].k1||"";
-document.getElementById("k2_"+i).value=data[s].k2||"";
-document.getElementById("m_"+i).value=data[s].m||"";
+document.getElementById("t1_"+i).value=data[s].t1;
+document.getElementById("t2_"+i).value=data[s].t2;
+document.getElementById("t3_"+i).value=data[s].t3;
+document.getElementById("k1_"+i).value=data[s].k1;
+document.getElementById("k2_"+i).value=data[s].k2;
+document.getElementById("m_"+i).value=data[s].m;
 
 calc(i);
 
 });
 
-});
+}
 
-// INPUT LOCK + SAVE
+// 🔥 LIVE UPDATE FIX
 document.addEventListener("input",()=>{
 
 subjects.forEach((_,i)=>calc(i));
-save();
+
+if(isAdmin){
+document.getElementById("saveBtn").disabled=false;
+}
 
 });
 
-// ADMIN LOCK FIX
-if(!isAdmin){
-document.addEventListener("click",(e)=>{
-if(e.target.tagName==="INPUT"){
-e.target.readOnly=true;
-}
-});
-}
+// INIT
+load();
 
 </script>
 
