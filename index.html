@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Noten Cloud</title>
+<title>Noten System</title>
 
 <style>
 body{
@@ -13,37 +13,10 @@ body{
   padding:20px;
 }
 
-h1{text-align:center;}
-
-.container{
-  max-width:900px;
-  margin:auto;
-}
-
-.admin{
-  display:none;
-  background:#1e293b;
-  padding:15px;
-  border-radius:10px;
-  margin-bottom:20px;
-}
-
-input,select,button{
-  padding:8px;
-  margin:5px;
-  border-radius:8px;
-  border:none;
-}
-
-button{
-  background:#38bdf8;
-  cursor:pointer;
-}
-button:hover{background:#0ea5e9;}
-
 table{
   width:100%;
   border-collapse: collapse;
+  margin-top:20px;
   background:#1e293b;
 }
 
@@ -56,136 +29,95 @@ th,td{
 th{
   background:#0ea5e9;
 }
+
+input,select,button{
+  padding:6px;
+  margin:4px;
+  border-radius:6px;
+  border:none;
+}
+
+button{
+  background:#38bdf8;
+  cursor:pointer;
+}
+button:hover{background:#0ea5e9;}
 </style>
 </head>
 
 <body>
 
-<h1>📚 Noten Cloud App</h1>
+<h1>📚 Noten Tabelle</h1>
 
-<div class="container">
-
-<!-- 🔐 ADMIN -->
-<div id="adminPanel" class="admin">
-  <h3>Admin Mode</h3>
-
-  <input id="subject" placeholder="Fach">
-
-  <select id="semester">
-    <option value="1">Halbjahr 1</option>
-    <option value="2">Halbjahr 2</option>
-  </select>
-
-  <select id="type">
-    <option value="test">Test</option>
-    <option value="exam">Klassenarbeit</option>
-    <option value="oral">Mündlich</option>
-  </select>
-
-  <input id="grade" type="number" step="0.1" placeholder="Note">
-
-  <button onclick="addGrade()">Hinzufügen</button>
-</div>
+<button onclick="save()">Speichern</button>
 
 <table>
 <thead>
 <tr>
   <th>Fach</th>
-  <th>HJ1</th>
-  <th>HJ2</th>
-  <th>Ø</th>
+  <th>HJ1 Ø</th>
+  <th>HJ2 Ø</th>
+  <th>Gesamt</th>
 </tr>
 </thead>
 <tbody id="body"></tbody>
 </table>
 
-</div>
-
 <script type="module">
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-// 🔥 SUPABASE VERBINDUNG
 const supabase = createClient(
   "https://qrtnqwfcarwvxfljkqon.supabase.co",
   "sb_publishable_j7O7k3fTxwF5_LzTUjrt4w_dzW1ruuv"
 );
 
-// 🔐 ADMIN (?admin=1)
-const isAdmin = new URLSearchParams(location.search).get("admin") === "1";
-if(isAdmin) document.getElementById("adminPanel").style.display = "block";
+// 📚 feste Fächer
+const subjects = ["Mathe","Deutsch","Englisch","Französisch","NWT","Geo","Bio","Reli","Musik","GK"];
 
-// 📦 DATEN
-let data = [];
+let data = {};
 
 // 📥 LOAD
 async function load(){
-  const { data: result, error } = await supabase
-    .from("grades")
-    .select("*");
-
-  if(error){
-    console.log("LOAD ERROR:", error);
-    return;
-  }
-
+  const { data: result } = await supabase.from("grades").select("*");
   data = result || [];
   render();
 }
 
 load();
 
-// ➕ ADD NOTE
-window.addGrade = async function(){
+// 📊 WERT PRO FACH
+function calc(entry){
 
-  if(!isAdmin) return;
+  let exam = [entry.exam1, entry.exam2, entry.exam3].filter(x => x != null);
+  let test = [entry.test1, entry.test2].filter(x => x != null);
 
-  const subject = document.getElementById("subject").value;
-  const semester = parseInt(document.getElementById("semester").value);
-  const type = document.getElementById("type").value;
-  const grade = parseFloat(document.getElementById("grade").value);
+  let oral = entry.oral;
 
-  if(!subject || isNaN(grade)) return;
+  let examAvg = exam.length ? exam.reduce((a,b)=>a+b)/exam.length : null;
+  let testAvg = test.length ? test.reduce((a,b)=>a+b)/test.length : null;
 
-  const { error } = await supabase
-    .from("grades")
-    .insert({
-      subject,
-      semester,
-      type,
-      grade
-    });
-
-  if(error){
-    console.log("INSERT ERROR:", error);
-  }
-
-  load();
-};
-
-// 📊 BERECHNUNG
-function calc(list, subject){
-
-  const is50 = ["Geo","Bio","Reli","Gemeinschaftskunde","Musik"].includes(subject);
+  if(!examAvg && !testAvg && !oral) return "-";
 
   let sum = 0;
   let w = 0;
 
-  list.forEach(n => {
+  if(examAvg !== null){
+    sum += examAvg * 0.6;
+    w += 0.6;
+  }
 
-    let weight;
+  if(testAvg !== null){
+    sum += testAvg * 0.6;
+    w += 0.6;
+  }
 
-    if(n.type === "oral"){
-      weight = is50 ? 0.5 : 0.4;
-    } else {
-      weight = is50 ? 0.5 : 0.6;
-    }
+  if(oral !== null){
+    sum += oral * 0.4;
+    w += 0.4;
+  }
 
-    sum += n.grade * weight;
-    w += weight;
-  });
-
-  return w ? (sum / w).toFixed(2) : "-";
+  return (sum / w).toFixed(2);
 }
 
 // 📊 RENDER
@@ -194,29 +126,49 @@ function render(){
   const body = document.getElementById("body");
   body.innerHTML = "";
 
-  const subjects = [...new Set(data.map(d => d.subject))];
-
   subjects.forEach(sub => {
 
-    const h1 = data.filter(d => d.subject === sub && d.semester === 1);
-    const h2 = data.filter(d => d.subject === sub && d.semester === 2);
-
-    const avg1 = calc(h1, sub);
-    const avg2 = calc(h2, sub);
-
-    const both = [parseFloat(avg1), parseFloat(avg2)].filter(x => !isNaN(x));
-    const total = both.length ? (both.reduce((a,b)=>a+b,0)/both.length).toFixed(2) : "-";
+    const h1 = data.find(d => d.subject === sub && d.semester === 1) || {};
+    const h2 = data.find(d => d.subject === sub && d.semester === 2) || {};
 
     body.innerHTML += `
       <tr>
         <td>${sub}</td>
-        <td>${avg1}</td>
-        <td>${avg2}</td>
-        <td><b>${total}</b></td>
+        <td>${calc(h1)}</td>
+        <td>${calc(h2)}</td>
+        <td><b>${avg(calc(h1),calc(h2))}</b></td>
       </tr>
     `;
   });
 }
+
+// 📊 Gesamt
+function avg(a,b){
+  let arr = [parseFloat(a), parseFloat(b)].filter(x=>!isNaN(x));
+  if(!arr.length) return "-";
+  return (arr.reduce((x,y)=>x+y)/arr.length).toFixed(2);
+}
+
+// 💾 SPEICHERN (TEST FIX)
+window.save = async function(){
+
+  for(let sub of subjects){
+
+    await supabase.from("grades").upsert({
+      subject: sub,
+      semester: 1,
+      exam1: 1,
+      exam2: null,
+      exam3: null,
+      test1: 2,
+      test2: 3,
+      oral: 2
+    });
+
+  }
+
+  load();
+};
 
 </script>
 
