@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Noten Dashboard</title>
+<title>Noten App</title>
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -12,37 +12,45 @@
 <style>
 body{
     margin:0;
-    font-family: Arial, sans-serif;
-    background: linear-gradient(135deg,#0f172a,#020617);
+    font-family: Arial;
+    background:#0b1220;
     color:white;
 }
 
-/* HEADER */
-header{
-    padding:20px;
-    text-align:center;
+/* TOP BAR */
+.header{
     background:#111827;
-    font-size:22px;
+    padding:15px;
+    font-size:20px;
     font-weight:bold;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+/* ADMIN BADGE */
+.admin{
+    color:#34d399;
+    font-size:14px;
 }
 
 /* CONTAINER */
 .container{
     padding:15px;
-    max-width:1200px;
+    max-width:1100px;
     margin:auto;
 }
 
-/* CARD STYLE */
+/* CARD */
 .card{
     background:#111827;
     padding:15px;
     border-radius:12px;
     margin-bottom:15px;
-    box-shadow:0 5px 15px rgba(0,0,0,0.4);
+    box-shadow:0 4px 10px rgba(0,0,0,0.3);
 }
 
-.subject-title{
+.title{
     font-size:18px;
     margin-bottom:10px;
     color:#60a5fa;
@@ -52,7 +60,6 @@ header{
 table{
     width:100%;
     border-collapse:collapse;
-    overflow-x:auto;
 }
 
 th,td{
@@ -62,36 +69,34 @@ th,td{
 }
 
 input{
-    width:60px;
-    padding:5px;
-    border-radius:6px;
-    border:none;
+    width:55px;
+    background:#0f172a;
+    color:white;
+    border:1px solid #334155;
     text-align:center;
+    border-radius:5px;
 }
 
-/* AVG */
 .avg{
-    font-weight:bold;
     color:#34d399;
-}
-
-/* RESPONSIVE */
-@media (max-width:700px){
-    input{width:45px;}
+    font-weight:bold;
 }
 </style>
 </head>
 
 <body>
 
-<header>📊 Noten Dashboard</header>
+<div class="header">
+📊 Noten App
+<div id="adminBadge"></div>
+</div>
 
 <div class="container" id="app"></div>
 
 <script>
 
 ////////////////////////////////////////////////////
-// 🔥 FIREBASE CONFIG (HIER EINSETZEN)
+// 🔥 FIREBASE CONFIG
 ////////////////////////////////////////////////////
 const firebaseConfig = {
   apiKey: "AIzaSyAdC2nb71oeF9XtasVpUnmJot0ZqaODSaQ",
@@ -102,27 +107,27 @@ const firebaseConfig = {
   messagingSenderId: "429440294646",
   appId: "1:429440294646:web:1db4b5690f10ea722b56d7",
   measurementId: "G-DDL10H1QWY"
+
 };
-  
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 ////////////////////////////////////////////////////
 
-// FÄCHER + GEWICHTUNG
-const subjects = [
-{name:"Mathe", type:"60/40"},
-{name:"Deutsch", type:"60/40"},
-{name:"Englisch", type:"60/40"},
-{name:"Bio", type:"50/50"},
-{name:"Geo", type:"50/50"},
-{name:"Musik", type:"50/50"},
-{name:"Religion", type:"50/50"},
-{name:"Sport", type:"60/40"}
-];
+// ADMIN MODUS
+const isAdmin = window.location.href.includes("admin=1");
+
+if(isAdmin){
+document.getElementById("adminBadge").innerText = "ADMIN MODE";
+}
 
 const app = document.getElementById("app");
+
+// Fächer
+const subjects = [
+"Mathe","Deutsch","Englisch","Bio","Geo","Musik","Religion","Sport"
+];
 
 // UI bauen
 subjects.forEach((s,i)=>{
@@ -131,7 +136,7 @@ const card = document.createElement("div");
 card.className="card";
 
 card.innerHTML = `
-<div class="subject-title">${s.name} (${s.type})</div>
+<div class="title">${s}</div>
 
 <table>
 <tr>
@@ -142,12 +147,12 @@ card.innerHTML = `
 </tr>
 
 <tr>
-<td><input id="t1_${i}" type="number"></td>
-<td><input id="t2_${i}" type="number"></td>
-<td><input id="t3_${i}" type="number"></td>
-<td><input id="k1_${i}" type="number"></td>
-<td><input id="k2_${i}" type="number"></td>
-<td><input id="m_${i}" type="number"></td>
+<td><input id="t1_${i}"></td>
+<td><input id="t2_${i}"></td>
+<td><input id="t3_${i}"></td>
+<td><input id="k1_${i}"></td>
+<td><input id="k2_${i}"></td>
+<td><input id="m_${i}"></td>
 <td class="avg" id="avg_${i}">-</td>
 </tr>
 </table>
@@ -157,40 +162,39 @@ app.appendChild(card);
 
 });
 
-// 🔥 BERECHNUNG
+// Berechnung (stabiler FIX)
 function calc(i){
 
-let t1 = +document.getElementById("t1_"+i).value || 0;
-let t2 = +document.getElementById("t2_"+i).value || 0;
-let t3 = +document.getElementById("t3_"+i).value || 0;
+let t1=+document.getElementById("t1_"+i).value||0;
+let t2=+document.getElementById("t2_"+i).value||0;
+let t3=+document.getElementById("t3_"+i).value||0;
 
-let k1 = +document.getElementById("k1_"+i).value || 0;
-let k2 = +document.getElementById("k2_"+i).value || 0;
+let k1=+document.getElementById("k1_"+i).value||0;
+let k2=+document.getElementById("k2_"+i).value||0;
 
-let m = +document.getElementById("m_"+i).value || 0;
+let m=+document.getElementById("m_"+i).value||0;
 
-// Tests (4 Tests = 1 KA)
-let testAvg = (t1+t2+t3)/3;
+// Tests
+let testAvg=(t1+t2+t3)/3;
 
 // KA
-let kaAvg = (k1+k2)/2;
+let kaAvg=(k1+k2)/2;
 
-// Gewichtung simpel stabil
-let result = (testAvg/4 + kaAvg + m)/3;
+// Gewichtung (stabilisiert)
+let result=(testAvg/4 + kaAvg + m)/3;
 
-document.getElementById("avg_"+i).innerText = result.toFixed(2);
+document.getElementById("avg_"+i).innerText=result.toFixed(2);
 
 return result;
 }
 
-// 💾 SPEICHERN
+// SPEICHERN
 function save(){
 
-let data = {};
+let data={};
 
 subjects.forEach((s,i)=>{
-
-data[s.name] = {
+data[s]={
 t1:document.getElementById("t1_"+i).value,
 t2:document.getElementById("t2_"+i).value,
 t3:document.getElementById("t3_"+i).value,
@@ -198,47 +202,43 @@ k1:document.getElementById("k1_"+i).value,
 k2:document.getElementById("k2_"+i).value,
 m:document.getElementById("m_"+i).value
 };
-
 });
 
 db.collection("noten").doc("user").set(data);
-
 }
 
-// 📥 LADEN
+// LADEN (FIX + stabil)
 async function load(){
 
-const doc = await db.collection("noten").doc("user").get();
+const doc=await db.collection("noten").doc("user").get();
 
 if(doc.exists){
-
-let data = doc.data();
+let data=doc.data();
 
 subjects.forEach((s,i)=>{
 
-if(data[s.name]){
-
-document.getElementById("t1_"+i).value = data[s.name].t1;
-document.getElementById("t2_"+i).value = data[s.name].t2;
-document.getElementById("t3_"+i).value = data[s.name].t3;
-document.getElementById("k1_"+i).value = data[s.name].k1;
-document.getElementById("k2_"+i).value = data[s.name].k2;
-document.getElementById("m_"+i).value = data[s.name].m;
+if(data[s]){
+document.getElementById("t1_"+i).value=data[s].t1||"";
+document.getElementById("t2_"+i).value=data[s].t2||"";
+document.getElementById("t3_"+i).value=data[s].t3||"";
+document.getElementById("k1_"+i).value=data[s].k1||"";
+document.getElementById("k2_"+i).value=data[s].k2||"";
+document.getElementById("m_"+i).value=data[s].m||"";
 
 calc(i);
-
 }
 
 });
 
 }
-
 }
 
-// AUTO UPDATE
-document.addEventListener("input", ()=>{
+// LIVE UPDATE FIX
+document.addEventListener("input",()=>{
+
 subjects.forEach((_,i)=>calc(i));
 save();
+
 });
 
 load();
