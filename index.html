@@ -13,10 +13,18 @@ body{
   padding:20px;
 }
 
+h1{
+  text-align:center;
+  margin-bottom:20px;
+  color:#38bdf8;
+}
+
 table{
   width:100%;
   border-collapse:collapse;
-  background:#1e293b;
+  background:rgba(30,41,59,0.9);
+  border-radius:12px;
+  overflow:hidden;
 }
 
 th,td{
@@ -30,32 +38,52 @@ th{
 }
 
 input{
-  width:60px;
+  width:55px;
   background:#0f172a;
   color:white;
   border:1px solid #334155;
-  text-align:center;
   border-radius:6px;
+  text-align:center;
+}
+
+.subject{
+  font-weight:bold;
+  background:#111827;
+}
+
+.avg{
+  font-weight:bold;
+  color:#38bdf8;
 }
 </style>
 </head>
 
 <body>
 
-<h1>📚 Noten</h1>
+<h1>📚 Noten System</h1>
 
 <table>
 <thead>
 <tr>
   <th>Fach</th>
-  <th>HJ</th>
+
   <th>KA1</th>
   <th>KA2</th>
   <th>KA3</th>
   <th>T1</th>
   <th>T2</th>
   <th>Mündlich</th>
-  <th>Ø</th>
+  <th>Ø HJ1</th>
+
+  <th>KA1</th>
+  <th>KA2</th>
+  <th>KA3</th>
+  <th>T1</th>
+  <th>T2</th>
+  <th>Mündlich</th>
+  <th>Ø HJ2</th>
+
+  <th>Gesamt</th>
 </tr>
 </thead>
 
@@ -71,10 +99,15 @@ const supabase = createClient(
   "sb_publishable_j7O7k3fTxwF5_LzTUjrt4w_dzW1ruuv"
 );
 
-const subjects = ["Mathe","Deutsch","Englisch","Französisch","NWT"];
+const subjects = [
+  "Mathe","Deutsch","Englisch","Französisch","NWT",
+  "Geo","Bio","Chemie","Physik","Geschichte",
+  "GK","Musik","Kunst","Reli","Sport"
+];
 
 let data = [];
 
+// 📥 LOAD
 async function load(){
   const { data: res } = await supabase.from("grades").select("*");
   data = res || [];
@@ -83,11 +116,12 @@ async function load(){
 
 load();
 
+// 🔍 GET
 function get(subject, semester){
   return data.find(d => d.subject === subject && d.semester === semester);
 }
 
-// 🧮 Berechnung
+// 🧮 BERECHNUNG
 function calc(e){
 
   if(!e) return "-";
@@ -108,24 +142,19 @@ function calc(e){
   return w ? (sum/w).toFixed(2) : "-";
 }
 
-// 💾 SAVE FIX
+// 💾 SAVE
 async function save(subject, semester, field, value){
 
   let entry = data.find(d => d.subject === subject && d.semester === semester);
 
   if(!entry){
-    entry = {subject, semester};
+    entry = { subject, semester };
+    data.push(entry);
   }
 
   entry[field] = value === "" ? null : parseFloat(value);
 
-  const { error } = await supabase.from("grades").upsert(entry, {
-    onConflict: 'subject,semester'
-  });
-
-  if(error) console.log(error);
-
-  load();
+  await supabase.from("grades").upsert(entry);
 }
 
 // 📊 RENDER
@@ -141,9 +170,7 @@ function render(){
 
     body.innerHTML += `
       <tr>
-        <td>${sub}</td>
-
-        <td>1</td>
+        <td class="subject">${sub}</td>
 
         ${cell(sub,1,"exam1",h1.exam1)}
         ${cell(sub,1,"exam2",h1.exam2)}
@@ -152,13 +179,7 @@ function render(){
         ${cell(sub,1,"test2",h1.test2)}
         ${cell(sub,1,"oral",h1.oral)}
 
-        <td>${calc(h1)}</td>
-      </tr>
-
-      <tr>
-        <td>${sub}</td>
-
-        <td>2</td>
+        <td class="avg">${calc(h1)}</td>
 
         ${cell(sub,2,"exam1",h2.exam1)}
         ${cell(sub,2,"exam2",h2.exam2)}
@@ -167,12 +188,15 @@ function render(){
         ${cell(sub,2,"test2",h2.test2)}
         ${cell(sub,2,"oral",h2.oral)}
 
-        <td>${calc(h2)}</td>
+        <td class="avg">${calc(h2)}</td>
+
+        <td class="avg">${avg(calc(h1),calc(h2))}</td>
       </tr>
     `;
   });
 }
 
+// 🧩 CELL INPUT
 function cell(subject, semester, field, value){
 
   return `
@@ -183,8 +207,16 @@ function cell(subject, semester, field, value){
   `;
 }
 
-window.update = async function(s, sem, f, v){
-  await save(s, sem, f, v);
+// 📊 TOTAL
+function avg(a,b){
+  let arr = [parseFloat(a), parseFloat(b)].filter(x=>!isNaN(x));
+  if(!arr.length) return "-";
+  return (arr.reduce((x,y)=>x+y)/arr.length).toFixed(2);
+}
+
+// 🌐 GLOBAL UPDATE
+window.update = async function(subject, semester, field, value){
+  await save(subject, semester, field, value);
 };
 
 </script>
