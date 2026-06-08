@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Noten Rechner</title>
 
-<!-- FIREBASE -->
+<!-- FIREBASE IMPORT -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
@@ -17,19 +17,25 @@ body{
     margin:20px;
 }
 
+h1{
+    text-align:center;
+}
+
 table{
     width:100%;
     border-collapse:collapse;
+    margin-top:20px;
 }
 
-td,th{
+th,td{
     border:1px solid #333;
-    padding:8px;
+    padding:10px;
     text-align:center;
 }
 
 input{
     width:60px;
+    font-size:16px;
 }
 </style>
 </head>
@@ -39,16 +45,25 @@ input{
 <h1>📊 Noten Rechner</h1>
 
 <table>
-<tbody id="body"></tbody>
+<thead>
+<tr>
+<th>Fach</th>
+<th>Note</th>
+</tr>
+</thead>
+
+<tbody id="tableBody"></tbody>
 </table>
 
 <script>
 
 ////////////////////////////////////////////////////
-// 🔥 HIER MUSST DU DEINEN FIREBASE BLOCK EINFÜGEN
+// 🔥 HIER KOMMT DEINE FIREBASE CONFIG REIN
+// (DEN BLOCK AUS FIREBASE EINFÜGEN)
 ////////////////////////////////////////////////////
 
-const firebaseConfig = {// Import the functions you need from the SDKs you need
+const firebaseConfig = {
+  // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 // TODO: Add SDKs for Firebase products that you want to use
@@ -70,7 +85,6 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
-  
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -78,59 +92,68 @@ const db = firebase.firestore();
 
 ////////////////////////////////////////////////////
 
-const subjects = [
+const faecher = [
 "Mathe",
 "Deutsch",
 "Englisch",
 "Bio",
 "Geo",
-"Musik"
+"Musik",
+"Religion",
+"Sport"
 ];
 
-const body = document.getElementById("body");
+const tableBody = document.getElementById("tableBody");
 
-// Tabelle bauen
-subjects.forEach((s,i)=>{
+// Tabelle erstellen
+faecher.forEach((fach, i) => {
+
 const row = document.createElement("tr");
 
 row.innerHTML = `
-<td>${s}</td>
-<td><input type="number" id="n${i}" min="1" max="6"></td>
+<td>${fach}</td>
+<td><input type="number" min="1" max="6" id="note${i}"></td>
 `;
 
-body.appendChild(row);
+tableBody.appendChild(row);
+
 });
 
 // speichern
-function save(){
-let data = {};
+function speichern(){
 
-subjects.forEach((s,i)=>{
-data[s] = document.getElementById("n"+i).value;
+let daten = {};
+
+faecher.forEach((fach, i) => {
+daten[fach] = document.getElementById("note"+i).value;
 });
 
-db.collection("noten").doc("user").set(data);
+db.collection("noten").doc("user1").set(daten);
+
 }
 
 // laden
-async function load(){
-const doc = await db.collection("noten").doc("user").get();
+async function laden(){
+
+const doc = await db.collection("noten").doc("user1").get();
 
 if(doc.exists){
-const data = doc.data();
+const daten = doc.data();
 
-subjects.forEach((s,i)=>{
-if(data[s]){
-document.getElementById("n"+i).value = data[s];
+faecher.forEach((fach, i) => {
+if(daten[fach]){
+document.getElementById("note"+i).value = daten[fach];
 }
 });
-}
+
 }
 
-// auto save
-document.addEventListener("input", save);
+}
 
-load();
+// automatisch speichern
+document.addEventListener("input", speichern);
+
+laden();
 
 </script>
 
