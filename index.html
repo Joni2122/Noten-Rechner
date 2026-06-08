@@ -3,65 +3,98 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Noten System</title>
+<title>Noten Dashboard</title>
 
-<!-- FIREBASE -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
 <style>
 body{
-    background:#111;
+    margin:0;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg,#0f172a,#020617);
     color:white;
-    font-family:Arial;
-    margin:10px;
 }
 
-h1{
+/* HEADER */
+header{
+    padding:20px;
     text-align:center;
+    background:#111827;
+    font-size:22px;
+    font-weight:bold;
 }
 
+/* CONTAINER */
+.container{
+    padding:15px;
+    max-width:1200px;
+    margin:auto;
+}
+
+/* CARD STYLE */
+.card{
+    background:#111827;
+    padding:15px;
+    border-radius:12px;
+    margin-bottom:15px;
+    box-shadow:0 5px 15px rgba(0,0,0,0.4);
+}
+
+.subject-title{
+    font-size:18px;
+    margin-bottom:10px;
+    color:#60a5fa;
+}
+
+/* TABLE */
 table{
     width:100%;
     border-collapse:collapse;
-    margin-bottom:30px;
+    overflow-x:auto;
 }
 
 th,td{
-    border:1px solid #333;
+    border:1px solid #374151;
     padding:6px;
     text-align:center;
 }
 
 input{
-    width:45px;
+    width:60px;
+    padding:5px;
+    border-radius:6px;
+    border:none;
     text-align:center;
-    background:#1a1a1a;
-    color:white;
-    border:1px solid #444;
 }
 
-.section{
-    margin-top:20px;
+/* AVG */
+.avg{
     font-weight:bold;
-    color:#4dd0ff;
+    color:#34d399;
+}
+
+/* RESPONSIVE */
+@media (max-width:700px){
+    input{width:45px;}
 }
 </style>
 </head>
 
 <body>
 
-<h1>📊 Noten System</h1>
+<header>📊 Noten Dashboard</header>
 
-<div id="container"></div>
+<div class="container" id="app"></div>
 
 <script>
 
 ////////////////////////////////////////////////////
-// 🔥 FIREBASE CONFIG HIER EINSETZEN
+// 🔥 FIREBASE CONFIG (HIER EINSETZEN)
 ////////////////////////////////////////////////////
 const firebaseConfig = {
-    apiKey: "AIzaSyAdC2nb71oeF9XtasVpUnmJot0ZqaODSaQ",
+  apiKey: "AIzaSyAdC2nb71oeF9XtasVpUnmJot0ZqaODSaQ",
   authDomain: "noten-fc7d8.firebaseapp.com",
   databaseURL: "https://noten-fc7d8-default-rtdb.firebaseio.com",
   projectId: "noten-fc7d8",
@@ -69,64 +102,42 @@ const firebaseConfig = {
   messagingSenderId: "429440294646",
   appId: "1:429440294646:web:1db4b5690f10ea722b56d7",
   measurementId: "G-DDL10H1QWY"
-
-  
 };
+  
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 ////////////////////////////////////////////////////
 
-const faecher = [
-{
-name:"Mathe",
-type:"60/40"
-},
-{
-name:"Deutsch",
-type:"60/40"
-},
-{
-name:"Englisch",
-type:"60/40"
-},
-{
-name:"Bio",
-type:"50/50"
-},
-{
-name:"Geo",
-type:"50/50"
-},
-{
-name:"Musik",
-type:"50/50"
-},
-{
-name:"Sport",
-type:"60/40"
-}
+// FÄCHER + GEWICHTUNG
+const subjects = [
+{name:"Mathe", type:"60/40"},
+{name:"Deutsch", type:"60/40"},
+{name:"Englisch", type:"60/40"},
+{name:"Bio", type:"50/50"},
+{name:"Geo", type:"50/50"},
+{name:"Musik", type:"50/50"},
+{name:"Religion", type:"50/50"},
+{name:"Sport", type:"60/40"}
 ];
 
-const container = document.getElementById("container");
+const app = document.getElementById("app");
 
-// Tabellen bauen
-faecher.forEach((fach,i)=>{
+// UI bauen
+subjects.forEach((s,i)=>{
 
-const div = document.createElement("div");
+const card = document.createElement("div");
+card.className="card";
 
-div.innerHTML = `
-<div class="section">${fach.name} (${fach.type})</div>
+card.innerHTML = `
+<div class="subject-title">${s.name} (${s.type})</div>
 
 <table>
 <tr>
-<th>Test 1</th>
-<th>Test 2</th>
-<th>Test 3</th>
-<th>KA 1</th>
-<th>KA 2</th>
-<th>Mündlich</th>
+<th>T1</th><th>T2</th><th>T3</th>
+<th>KA1</th><th>KA2</th>
+<th>M</th>
 <th>Ø</th>
 </tr>
 
@@ -137,85 +148,85 @@ div.innerHTML = `
 <td><input id="k1_${i}" type="number"></td>
 <td><input id="k2_${i}" type="number"></td>
 <td><input id="m_${i}" type="number"></td>
-<td id="avg_${i}">-</td>
+<td class="avg" id="avg_${i}">-</td>
 </tr>
 </table>
 `;
 
-container.appendChild(div);
+app.appendChild(card);
 
 });
 
-// Berechnung
+// 🔥 BERECHNUNG
 function calc(i){
 
-let t1 = parseFloat(document.getElementById("t1_"+i).value)||0;
-let t2 = parseFloat(document.getElementById("t2_"+i).value)||0;
-let t3 = parseFloat(document.getElementById("t3_"+i).value)||0;
+let t1 = +document.getElementById("t1_"+i).value || 0;
+let t2 = +document.getElementById("t2_"+i).value || 0;
+let t3 = +document.getElementById("t3_"+i).value || 0;
 
-let k1 = parseFloat(document.getElementById("k1_"+i).value)||0;
-let k2 = parseFloat(document.getElementById("k2_"+i).value)||0;
+let k1 = +document.getElementById("k1_"+i).value || 0;
+let k2 = +document.getElementById("k2_"+i).value || 0;
 
-let m = parseFloat(document.getElementById("m_"+i).value)||0;
+let m = +document.getElementById("m_"+i).value || 0;
 
-// Tests: 4 Tests = 1 KA
+// Tests (4 Tests = 1 KA)
 let testAvg = (t1+t2+t3)/3;
 
-// KA Schnitt
+// KA
 let kaAvg = (k1+k2)/2;
 
-// alles zusammen
-let weightedTests = testAvg / 4;
-
-let result = (weightedTests + kaAvg + m)/3;
+// Gewichtung simpel stabil
+let result = (testAvg/4 + kaAvg + m)/3;
 
 document.getElementById("avg_"+i).innerText = result.toFixed(2);
 
 return result;
 }
 
-// speichern
+// 💾 SPEICHERN
 function save(){
 
 let data = {};
 
-faecher.forEach((f,i)=>{
+subjects.forEach((s,i)=>{
 
-data[f.name] = {
-t1: document.getElementById("t1_"+i).value,
-t2: document.getElementById("t2_"+i).value,
-t3: document.getElementById("t3_"+i).value,
-k1: document.getElementById("k1_"+i).value,
-k2: document.getElementById("k2_"+i).value,
-m: document.getElementById("m_"+i).value
+data[s.name] = {
+t1:document.getElementById("t1_"+i).value,
+t2:document.getElementById("t2_"+i).value,
+t3:document.getElementById("t3_"+i).value,
+k1:document.getElementById("k1_"+i).value,
+k2:document.getElementById("k2_"+i).value,
+m:document.getElementById("m_"+i).value
 };
 
 });
 
-db.collection("noten").doc("user1").set(data);
+db.collection("noten").doc("user").set(data);
 
 }
 
-// laden
+// 📥 LADEN
 async function load(){
 
-const doc = await db.collection("noten").doc("user1").get();
+const doc = await db.collection("noten").doc("user").get();
 
 if(doc.exists){
-const data = doc.data();
 
-faecher.forEach((f,i)=>{
+let data = doc.data();
 
-if(data[f.name]){
+subjects.forEach((s,i)=>{
 
-document.getElementById("t1_"+i).value = data[f.name].t1;
-document.getElementById("t2_"+i).value = data[f.name].t2;
-document.getElementById("t3_"+i).value = data[f.name].t3;
-document.getElementById("k1_"+i).value = data[f.name].k1;
-document.getElementById("k2_"+i).value = data[f.name].k2;
-document.getElementById("m_"+i).value = data[f.name].m;
+if(data[s.name]){
+
+document.getElementById("t1_"+i).value = data[s.name].t1;
+document.getElementById("t2_"+i).value = data[s.name].t2;
+document.getElementById("t3_"+i).value = data[s.name].t3;
+document.getElementById("k1_"+i).value = data[s.name].k1;
+document.getElementById("k2_"+i).value = data[s.name].k2;
+document.getElementById("m_"+i).value = data[s.name].m;
 
 calc(i);
+
 }
 
 });
@@ -224,15 +235,10 @@ calc(i);
 
 }
 
-// input events
+// AUTO UPDATE
 document.addEventListener("input", ()=>{
-
-faecher.forEach((_,i)=>{
-calc(i);
-});
-
+subjects.forEach((_,i)=>calc(i));
 save();
-
 });
 
 load();
