@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Noten App</title>
+<title>Noten System</title>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
@@ -13,43 +12,40 @@
 body{
     margin:0;
     font-family: Arial;
-    background:#0b1220;
+    background: #0a0f1c;
     color:white;
 }
 
 /* TOP BAR */
-.header{
-    background:#111827;
+.topbar{
+    background: linear-gradient(90deg,#1e293b,#0f172a);
     padding:15px;
     font-size:20px;
     font-weight:bold;
     display:flex;
     justify-content:space-between;
-    align-items:center;
 }
 
-/* ADMIN BADGE */
-.admin{
-    color:#34d399;
-    font-size:14px;
+/* BADGE */
+.badge{
+    color:#4ade80;
 }
 
-/* CONTAINER */
+/* LAYOUT */
 .container{
     padding:15px;
-    max-width:1100px;
-    margin:auto;
 }
 
 /* CARD */
 .card{
     background:#111827;
+    margin:15px 0;
     padding:15px;
     border-radius:12px;
-    margin-bottom:15px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.3);
+    border:1px solid #1f2937;
 }
 
+/* TITLE */
 .title{
     font-size:18px;
     margin-bottom:10px;
@@ -70,11 +66,11 @@ th,td{
 
 input{
     width:55px;
+    padding:4px;
     background:#0f172a;
-    color:white;
     border:1px solid #334155;
+    color:white;
     text-align:center;
-    border-radius:5px;
 }
 
 .avg{
@@ -86,9 +82,9 @@ input{
 
 <body>
 
-<div class="header">
-📊 Noten App
-<div id="adminBadge"></div>
+<div class="topbar">
+📊 Noten System
+<div id="mode"></div>
 </div>
 
 <div class="container" id="app"></div>
@@ -96,7 +92,7 @@ input{
 <script>
 
 ////////////////////////////////////////////////////
-// 🔥 FIREBASE CONFIG
+// FIREBASE
 ////////////////////////////////////////////////////
 const firebaseConfig = {
   apiKey: "AIzaSyAdC2nb71oeF9XtasVpUnmJot0ZqaODSaQ",
@@ -107,7 +103,6 @@ const firebaseConfig = {
   messagingSenderId: "429440294646",
   appId: "1:429440294646:web:1db4b5690f10ea722b56d7",
   measurementId: "G-DDL10H1QWY"
-
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -115,19 +110,18 @@ const db = firebase.firestore();
 
 ////////////////////////////////////////////////////
 
-// ADMIN MODUS
-const isAdmin = window.location.href.includes("admin=1");
+// ADMIN MODE
+const isAdmin = new URLSearchParams(window.location.search).has("admin");
 
-if(isAdmin){
-document.getElementById("adminBadge").innerText = "ADMIN MODE";
-}
+document.getElementById("mode").innerText = isAdmin ? "ADMIN" : "VIEW";
+
+// Fächer
+const subjects = ["Mathe","Deutsch","Englisch","Bio","Geo","Musik","Religion","Sport"];
 
 const app = document.getElementById("app");
 
-// Fächer
-const subjects = [
-"Mathe","Deutsch","Englisch","Bio","Geo","Musik","Religion","Sport"
-];
+// Daten speichern lokal im Speicher
+let cache = {};
 
 // UI bauen
 subjects.forEach((s,i)=>{
@@ -162,7 +156,7 @@ app.appendChild(card);
 
 });
 
-// Berechnung (stabiler FIX)
+// CALC
 function calc(i){
 
 let t1=+document.getElementById("t1_"+i).value||0;
@@ -174,50 +168,54 @@ let k2=+document.getElementById("k2_"+i).value||0;
 
 let m=+document.getElementById("m_"+i).value||0;
 
-// Tests
-let testAvg=(t1+t2+t3)/3;
+let test=(t1+t2+t3)/3;
+let ka=(k1+k2)/2;
 
-// KA
-let kaAvg=(k1+k2)/2;
-
-// Gewichtung (stabilisiert)
-let result=(testAvg/4 + kaAvg + m)/3;
+let result=(test/4 + ka + m)/3;
 
 document.getElementById("avg_"+i).innerText=result.toFixed(2);
 
 return result;
 }
 
-// SPEICHERN
+// SAVE
 function save(){
 
 let data={};
 
 subjects.forEach((s,i)=>{
+
 data[s]={
-t1:document.getElementById("t1_"+i).value,
-t2:document.getElementById("t2_"+i).value,
-t3:document.getElementById("t3_"+i).value,
-k1:document.getElementById("k1_"+i).value,
-k2:document.getElementById("k2_"+i).value,
-m:document.getElementById("m_"+i).value
+t1:t1v(i),t2:t2v(i),t3:t3v(i),
+k1:k1v(i),k2:k2v(i),
+m:mv(i)
 };
+
 });
 
 db.collection("noten").doc("user").set(data);
 }
 
-// LADEN (FIX + stabil)
-async function load(){
+// helpers
+const t1v=i=>document.getElementById("t1_"+i).value;
+const t2v=i=>document.getElementById("t2_"+i).value;
+const t3v=i=>document.getElementById("t3_"+i).value;
+const k1v=i=>document.getElementById("k1_"+i).value;
+const k2v=i=>document.getElementById("k2_"+i).value;
+const mv=i=>document.getElementById("m_"+i).value;
 
-const doc=await db.collection("noten").doc("user").get();
+// 🔥 REALTIME FIX (WICHTIGSTE VERBESSERUNG)
+db.collection("noten").doc("user")
+.onSnapshot(doc=>{
 
-if(doc.exists){
+if(!doc.exists) return;
+
 let data=doc.data();
 
 subjects.forEach((s,i)=>{
 
-if(data[s]){
+if(!data[s]) return;
+
 document.getElementById("t1_"+i).value=data[s].t1||"";
 document.getElementById("t2_"+i).value=data[s].t2||"";
 document.getElementById("t3_"+i).value=data[s].t3||"";
@@ -226,14 +224,12 @@ document.getElementById("k2_"+i).value=data[s].k2||"";
 document.getElementById("m_"+i).value=data[s].m||"";
 
 calc(i);
-}
 
 });
 
-}
-}
+});
 
-// LIVE UPDATE FIX
+// INPUT LOCK + SAVE
 document.addEventListener("input",()=>{
 
 subjects.forEach((_,i)=>calc(i));
@@ -241,7 +237,14 @@ save();
 
 });
 
-load();
+// ADMIN LOCK FIX
+if(!isAdmin){
+document.addEventListener("click",(e)=>{
+if(e.target.tagName==="INPUT"){
+e.target.readOnly=true;
+}
+});
+}
 
 </script>
 
