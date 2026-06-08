@@ -10,23 +10,28 @@ body{
     background:#111;
     color:white;
     font-family:Arial;
-    margin:20px;
+    margin:10px;
 }
 
 h1{
     text-align:center;
 }
 
+.table-wrap{
+    overflow-x:auto;
+}
+
 table{
-    width:100%;
     border-collapse:collapse;
-    min-width:1400px;
+    min-width:1500px;
+    width:100%;
 }
 
 th,td{
     border:1px solid #333;
     padding:6px;
     text-align:center;
+    font-size:14px;
 }
 
 th{
@@ -34,7 +39,7 @@ th{
 }
 
 input{
-    width:55px;
+    width:48px;
     background:#1a1a1a;
     color:white;
     border:1px solid #444;
@@ -43,13 +48,14 @@ input{
 
 .subject{
     font-weight:bold;
-    min-width:140px;
+    min-width:150px;
 }
 
 .container{
     display:flex;
-    flex-direction:column;
+    flex-wrap:wrap;
     gap:3px;
+    justify-content:center;
 }
 
 .avg{
@@ -66,6 +72,10 @@ input{
     pointer-events:none;
     opacity:0.6;
 }
+
+@media(max-width:700px){
+    input{width:42px;}
+}
 </style>
 </head>
 
@@ -74,29 +84,41 @@ input{
 <h1>Notenverwaltung</h1>
 <div id="mode"></div>
 
+<div class="table-wrap">
 <table>
+
 <thead>
 <tr>
 <th>Fach</th>
-<th colspan="3">Halbjahr 1</th>
+
+<th colspan="6">Halbjahr 1</th>
 <th>Ø</th>
-<th colspan="3">Halbjahr 2</th>
+
+<th colspan="6">Halbjahr 2</th>
 <th>Ø</th>
-<th>Endnote</th>
+
+<th>Ende</th>
 </tr>
 
 <tr>
 <th></th>
-<th>T</th><th>K</th><th>M</th>
+<th>T1</th><th>T2</th>
+<th>K1</th><th>K2</th><th>K3</th>
+<th>M</th>
 <th></th>
-<th>T</th><th>K</th><th>M</th>
+
+<th>T1</th><th>T2</th>
+<th>K1</th><th>K2</th><th>K3</th>
+<th>M</th>
 <th></th>
 <th></th>
 </tr>
 </thead>
 
 <tbody id="body"></tbody>
+
 </table>
+</div>
 
 <script>
 
@@ -106,27 +128,76 @@ document.getElementById("mode").innerText =
 isAdmin ? "ADMIN MODUS" : "VIEW MODUS";
 
 const subjects = [
-"Deutsch","Mathe","Englisch","Biologie","Chemie",
-"Physik","Geo","Geschichte","GK","Musik","Sport"
+"Deutsch","Mathe","Englisch","Physik","Chemie",
+"Biologie","Geo","Geschichte","GK","Religion","Musik","Sport"
 ];
 
-// Gewichtungen
 function weights(name){
 
-if(name === "Musik"){
-return {t:0.1,k:0.5,m:0.4};
-}
+const halfHalf = [
+"Geo","Biologie","Gemeinschaftskunde","Religion","Musik","GK"
+];
 
 if(name === "Sport"){
-return {t:0.6,k:0.4,m:0};
+return {s:1,m:0};
 }
 
-return {t:0.6,k:0.2,m:0.2};
+if(halfHalf.includes(name)){
+return {s:0.5,m:0.5};
+}
+
+return {s:0.6,m:0.4};
+
+}
+
+function avg(container){
+
+const v = [...container.querySelectorAll("input")]
+.map(i=>parseFloat(i.value))
+.filter(x=>!isNaN(x));
+
+if(!v.length) return null;
+
+return v.reduce((a,b)=>a+b)/v.length;
+}
+
+function calcHalf(row,prefix,w){
+
+const t = avg(row.querySelector("."+prefix+"t"));
+const k = avg(row.querySelector("."+prefix+"k"));
+const m = avg(row.querySelector("."+prefix+"m"));
+
+let schrift = [];
+let gew = [];
+
+// 4 Tests = 1 Klassenarbeit
+if(t!==null){schrift.push(t);gew.push(0.25);}
+if(k!==null){schrift.push(k);gew.push(1);}
+
+let schriftAvg = null;
+
+if(schrift.length){
+schriftAvg =
+schrift.reduce((a,b,i)=>a+b*gew[i],0)
+/ gew.reduce((a,b)=>a+b,0);
+}
+
+let res = 0;
+
+if(schriftAvg!==null){
+res += schriftAvg * w.s;
+}
+
+if(m!==null){
+res += m * w.m;
+}
+
+return res || null;
 }
 
 const body = document.getElementById("body");
 
-subjects.forEach(name => {
+subjects.forEach(name=>{
 
 const tr = document.createElement("tr");
 
@@ -136,12 +207,22 @@ tr.innerHTML = `
 <td class="subject">${name}</td>
 
 <td><div class="container h1t"></div></td>
+<td><div class="container h1t"></div></td>
+
 <td><div class="container h1k"></div></td>
+<td><div class="container h1k"></div></td>
+<td><div class="container h1k"></div></td>
+
 <td><div class="container h1m"></div></td>
 <td class="avg h1a">-</td>
 
 <td><div class="container h2t"></div></td>
+<td><div class="container h2t"></div></td>
+
 <td><div class="container h2k"></div></td>
+<td><div class="container h2k"></div></td>
+<td><div class="container h2k"></div></td>
+
 <td><div class="container h2m"></div></td>
 <td class="avg h2a">-</td>
 
@@ -152,79 +233,39 @@ body.appendChild(tr);
 
 });
 
-// Input erstellen
-function addInput(container){
-
-const i = document.createElement("input");
-i.type = "number";
-i.min = 1;
-i.max = 6;
-i.step = 0.25;
-
-i.addEventListener("input", updateAll);
-
-container.appendChild(i);
-
-if(isAdmin && i.value !== ""){
-addInput(container);
+function addInput(c){
+const i=document.createElement("input");
+i.type="number";
+i.min=1;
+i.max=6;
+i.step=0.25;
+i.addEventListener("input",updateAll);
+c.appendChild(i);
 }
 
-}
-
-// Container initialisieren
 document.querySelectorAll(".container").forEach(c=>{
 addInput(c);
 });
 
-// Durchschnitt
-function avg(container){
-
-const values = [...container.querySelectorAll("input")]
-.map(i => parseFloat(i.value))
-.filter(v => !isNaN(v));
-
-if(values.length === 0) return null;
-
-return values.reduce((a,b)=>a+b,0)/values.length;
-}
-
-// Halbjahr
-function calcHalf(row, prefix, w){
-
-const t = avg(row.querySelector("." + prefix + "t"));
-const k = avg(row.querySelector("." + prefix + "k"));
-const m = avg(row.querySelector("." + prefix + "m"));
-
-let sum = 0;
-let ws = 0;
-
-if(t!==null){sum+=t*w.t; ws+=w.t;}
-if(k!==null){sum+=k*w.k; ws+=w.k;}
-if(m!==null){sum+=m*w.m; ws+=w.m;}
-
-return ws ? sum/ws : null;
-}
-
-// alles berechnen
 function updateAll(){
 
 document.querySelectorAll("tbody tr").forEach(row=>{
 
-const name = row.querySelector(".subject").innerText;
-const w = weights(name);
+const name=row.querySelector(".subject").innerText;
+const w=weights(name);
 
-const h1 = calcHalf(row,"h1",w);
-const h2 = calcHalf(row,"h2",w);
+const h1=calcHalf(row,"h1",w);
+const h2=calcHalf(row,"h2",w);
 
-row.querySelector(".h1a").innerText = h1 ? h1.toFixed(2) : "-";
-row.querySelector(".h2a").innerText = h2 ? h2.toFixed(2) : "-";
+row.querySelector(".h1a").innerText=h1?h1.toFixed(2):"-";
+row.querySelector(".h2a").innerText=h2?h2.toFixed(2):"-";
 
-let end = null;
+let end=null;
 
-if(h1!==null && h2!==null) end = (h1+h2)/2;
-else end = h1 || h2;
+if(h1&&h2) end=(h1+h2)/2;
+else end=h1||h2;
 
-row.querySelector(".end").innerText = end ? end.toFixed(2) : "-";
+row.querySelector(".end").innerText=end?end.toFixed(2):"-";
 
 });
 
