@@ -2,270 +2,191 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Noten Dashboard</title>
-
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<title>Noten Rechner</title>
 
 <style>
-
-/* 🌈 NEUES MODERNES DESIGN */
-body{
-    margin:0;
-    font-family: Arial;
-    background: radial-gradient(circle at top,#1e293b,#0b1020);
-    color:white;
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  margin: 0;
+  padding: 20px;
 }
 
-/* HEADER */
-.header{
-    padding:18px;
-    font-size:22px;
-    font-weight:bold;
-    display:flex;
-    justify-content:space-between;
-    background:#0f172a;
-    border-bottom:1px solid #1f2937;
+.container {
+  max-width: 800px;
+  margin: auto;
 }
 
-/* GRID */
-.grid{
-    display:grid;
-    grid-template-columns: repeat(auto-fit,minmax(280px,1fr));
-    gap:15px;
-    padding:15px;
+h1 {
+  text-align: center;
 }
 
-/* CARD */
-.card{
-    background:#111827;
-    border-radius:16px;
-    padding:12px;
-    box-shadow:0 10px 25px rgba(0,0,0,0.4);
+.card {
+  background: #1e293b;
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 15px;
 }
 
-.title{
-    font-size:18px;
-    margin-bottom:10px;
-    color:#60a5fa;
+input, select, button {
+  padding: 10px;
+  margin: 5px;
+  border-radius: 8px;
+  border: none;
 }
 
-/* INPUT GRID */
-.row{
-    display:grid;
-    grid-template-columns: repeat(6,1fr);
-    gap:5px;
+button {
+  background: #38bdf8;
+  cursor: pointer;
 }
 
-/* INPUTS */
-input{
-    width:100%;
-    padding:6px;
-    border-radius:8px;
-    border:none;
-    text-align:center;
-    background:#0f172a;
-    color:white;
-    font-size:14px;
+button:hover {
+  background: #0ea5e9;
 }
 
-/* AVG */
-.avg{
-    margin-top:8px;
-    font-weight:bold;
-    color:#34d399;
+.subject {
+  background: #334155;
+  padding: 10px;
+  border-radius: 10px;
+  margin-top: 10px;
 }
 
-/* BUTTON */
-button{
-    margin:10px;
-    padding:10px 14px;
-    border:none;
-    border-radius:10px;
-    background:#2563eb;
-    color:white;
-    cursor:pointer;
+.small {
+  font-size: 12px;
+  opacity: 0.7;
 }
-
-button:hover{
-    background:#1d4ed8;
-}
-
 </style>
 </head>
 
 <body>
 
-<div class="header">
-📊 Noten System
-<div id="mode"></div>
-</div>
+<div class="container">
+  <h1>📚 Noten Rechner</h1>
 
-<div id="app" class="grid"></div>
+  <div id="adminPanel" class="card" style="display:none;">
+    <h3>🔐 Admin Panel</h3>
 
-<div style="text-align:center;">
-<button id="saveBtn" style="display:none;">💾 Speichern</button>
+    <input id="subject" placeholder="Fach">
+    <input id="grade" type="number" step="0.1" placeholder="Note">
+    
+    <select id="type">
+      <option value="written">Schriftlich</option>
+      <option value="oral">Mündlich</option>
+    </select>
+
+    <button onclick="addGrade()">Hinzufügen</button>
+
+    <p class="small">Admin Modus aktiv</p>
+  </div>
+
+  <div id="list"></div>
 </div>
 
 <script>
+// -------------------------
+// ADMIN CHECK (?admin=1)
+// -------------------------
+const urlParams = new URLSearchParams(window.location.search);
+const isAdmin = urlParams.get("admin") === "1";
 
-////////////////////////////////////////////////////
-// FIREBASE
-////////////////////////////////////////////////////
-const firebaseConfig = {
-  apiKey: "AIzaSyAdC2nb71oeF9XtasVpUnmJot0ZqaODSaQ",
-  authDomain: "noten-fc7d8.firebaseapp.com",
-  databaseURL: "https://noten-fc7d8-default-rtdb.firebaseio.com",
-  projectId: "noten-fc7d8",
-  storageBucket: "noten-fc7d8.firebasestorage.app",
-  messagingSenderId: "429440294646",
-  appId: "1:429440294646:web:1db4b5690f10ea722b56d7",
-  measurementId: "G-DDL10H1QWY"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-
-////////////////////////////////////////////////////
-
-// ADMIN CHECK
-const isAdmin = new URLSearchParams(location.search).has("admin");
-
-document.getElementById("mode").innerText =
-isAdmin ? "ADMIN MODE" : "VIEW MODE";
-
-if(isAdmin){
-document.getElementById("saveBtn").style.display="inline-block";
+if (isAdmin) {
+  document.getElementById("adminPanel").style.display = "block";
 }
 
-const subjects = [
-"Mathe","Deutsch","Englisch","Bio","Geo","Musik","Religion","Sport"
-];
+// -------------------------
+// DATEN
+// -------------------------
+const subjects = {};
 
-const app = document.getElementById("app");
+// 50/50 Fächer
+const equalSubjects = ["Geo", "Bio", "Reli", "Gemeinschaftskunde", "Musik"];
 
-// DATA CACHE
-let cache = {};
+// -------------------------
+// GEWICHTUNG
+// -------------------------
+function getWeight(subject, type) {
+  const isEqual = equalSubjects.includes(subject);
+  if (isEqual) return 0.5;
 
-// UI
-subjects.forEach((s,i)=>{
-
-const card = document.createElement("div");
-card.className="card";
-
-card.innerHTML = `
-<div class="title">${s}</div>
-
-<div class="row">
-<input id="t1_${i}" placeholder="T1">
-<input id="t2_${i}" placeholder="T2">
-<input id="t3_${i}" placeholder="T3">
-<input id="k1_${i}" placeholder="KA1">
-<input id="k2_${i}" placeholder="KA2">
-<input id="m_${i}" placeholder="M">
-</div>
-
-<div class="avg" id="avg_${i}">Ø: -</div>
-`;
-
-app.appendChild(card);
-
-});
-
-// 🧮 NEUE BERECHNUNG (STABIL)
-function calc(i){
-
-let t1=+val("t1_"+i);
-let t2=+val("t2_"+i);
-let t3=+val("t3_"+i);
-
-let k1=+val("k1_"+i);
-let k2=+val("k2_"+i);
-
-let m=+val("m_"+i);
-
-// Tests → 4 = 1 KA
-let testAvg=(t1+t2+t3)/3;
-let testWeight=testAvg/4;
-
-let kaAvg=(k1+k2)/2;
-
-// Gesamt
-let result=(testWeight+kaAvg+m)/3;
-
-document.getElementById("avg_"+i).innerText="Ø: "+result.toFixed(2);
-
-cache[i]=result;
+  return type === "written" ? 0.6 : 0.4;
 }
 
-function val(id){
-return document.getElementById(id).value||0;
+// -------------------------
+// NOTE HINZUFÜGEN (ADMIN)
+// -------------------------
+function addGrade() {
+  if (!isAdmin) return;
+
+  const subject = document.getElementById("subject").value.trim();
+  const grade = parseFloat(document.getElementById("grade").value);
+  const type = document.getElementById("type").value;
+
+  if (!subject || isNaN(grade)) return;
+
+  if (!subjects[subject]) {
+    subjects[subject] = [];
+  }
+
+  subjects[subject].push({ grade, type });
+
+  render();
 }
 
-// 💾 SAVE BUTTON (NUR ADMIN)
-document.getElementById("saveBtn").onclick=async()=>{
+// -------------------------
+// DURCHSCHNITT
+// -------------------------
+function calcAverage(grades, subject) {
+  let sum = 0;
+  let weightSum = 0;
 
-let data={};
+  grades.forEach(g => {
+    const w = getWeight(subject, g.type);
+    sum += g.grade * w;
+    weightSum += w;
+  });
 
-subjects.forEach((s,i)=>{
-
-data[s]={
-t1:val("t1_"+i),
-t2:val("t2_"+i),
-t3:val("t3_"+i),
-k1:val("k1_"+i),
-k2:val("k2_"+i),
-m:val("m_"+i)
-};
-
-});
-
-await db.collection("noten").doc("user").set(data);
-
-alert("Gespeichert ✔");
-};
-
-// 📥 LOAD
-async function load(){
-
-const doc=await db.collection("noten").doc("user").get();
-
-if(!doc.exists)return;
-
-let data=doc.data();
-
-subjects.forEach((s,i)=>{
-
-if(!data[s])return;
-
-document.getElementById("t1_"+i).value=data[s].t1;
-document.getElementById("t2_"+i).value=data[s].t2;
-document.getElementById("t3_"+i).value=data[s].t3;
-document.getElementById("k1_"+i).value=data[s].k1;
-document.getElementById("k2_"+i).value=data[s].k2;
-document.getElementById("m_"+i).value=data[s].m;
-
-calc(i);
-
-});
-
+  return weightSum === 0 ? "-" : (sum / weightSum).toFixed(2);
 }
 
-// 🔥 LIVE UPDATE FIX
-document.addEventListener("input",()=>{
+// -------------------------
+// RENDER
+// -------------------------
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
 
-subjects.forEach((_,i)=>calc(i));
+  Object.keys(subjects).forEach(sub => {
+    const avg = calcAverage(subjects[sub], sub);
 
-if(isAdmin){
-document.getElementById("saveBtn").disabled=false;
+    const div = document.createElement("div");
+    div.className = "subject";
+
+    div.innerHTML = `
+      <b>${sub}</b><br>
+      Durchschnitt: <b>${avg}</b><br>
+      ${subjects[sub].map((g, i) => `
+        ${g.grade} (${g.type})
+        ${isAdmin ? `<button onclick="deleteGrade('${sub}',${i})">❌</button>` : ""}
+      `).join("<br>")}
+    `;
+
+    list.appendChild(div);
+  });
 }
 
-});
+// -------------------------
+// LÖSCHEN (ADMIN)
+// -------------------------
+function deleteGrade(subject, index) {
+  if (!isAdmin) return;
 
-// INIT
-load();
+  subjects[subject].splice(index, 1);
+  render();
+}
 
+// Start
+render();
 </script>
 
 </body>
