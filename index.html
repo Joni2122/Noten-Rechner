@@ -5,85 +5,45 @@
 <title>Noten App</title>
 
 <style>
-body {
-  font-family: Arial;
-  background: #0f0f0f;
-  color: white;
-  margin: 0;
-}
-
-h1 {
-  text-align: center;
-  padding: 20px;
-}
-
-table {
-  width: 95%;
-  margin: auto;
-  border-collapse: collapse;
-}
-
-th, td {
-  border: 1px solid #333;
-  padding: 8px;
-  text-align: center;
-}
-
-th {
-  background: #222;
-}
-
-td[contenteditable="true"] {
-  background: #1e1e1e;
-}
-
-button {
-  margin: 10px;
-  padding: 10px;
-  cursor: pointer;
-  border: none;
-  background: #2d2d2d;
-  color: white;
-}
-
-button:hover {
-  background: #444;
-}
-
-.admin {
-  display: none;
-}
+body { font-family: Arial; background:#0f0f0f; color:white; }
+h1 { text-align:center; }
+table { width:95%; margin:auto; border-collapse:collapse; }
+th,td { border:1px solid #333; padding:6px; text-align:center; }
+th { background:#222; }
+td[contenteditable="true"] { background:#1e1e1e; }
+button { margin:10px; padding:10px; }
+.admin { display:none; }
 </style>
 </head>
 
 <body>
 
-<h1>📊 Noten Übersicht</h1>
+<h1>📊 Noten System</h1>
 
 <button onclick="saveData()" class="admin">💾 Speichern</button>
 
 <table>
-  <thead>
-    <tr>
-      <th>Fach</th>
-      <th>KA1</th>
-      <th>KA2</th>
-      <th>KA3</th>
-      <th>Test1</th>
-      <th>Test2</th>
-      <th>Test3</th>
-      <th>Test4</th>
-      <th>Mündlich</th>
-      <th>Endnote</th>
-    </tr>
-  </thead>
+<thead>
+<tr>
+<th>Fach</th>
+<th>KA1</th><th>KA2</th><th>KA3</th>
+<th>T1</th><th>T2</th>
+<th>M</th>
+<th>HJ1</th>
+<th>KA1</th><th>KA2</th><th>KA3</th>
+<th>T1</th><th>T2</th>
+<th>M</th>
+<th>HJ2</th>
+<th>Gesamt</th>
+</tr>
+</thead>
 
-  <tbody id="body"></tbody>
+<tbody id="body"></tbody>
 </table>
 
 <script>
 
-const scriptURL = "https://script.google.com/macros/s/AKfycbzxh53UZEoaPM5BripHYSZqH9B4Z4BbtzDEQZZg9BEA9OuMK3nvJvaO3As261hBOmk/exec";
+const scriptURL = "HIER_DEINE_URL_EINFÜGEN";
 
 const faecher = [
 "Mathe","Deutsch","Englisch","Französisch",
@@ -91,101 +51,87 @@ const faecher = [
 "Geographie","Musik"
 ];
 
-// Admin Mode
+// Admin
 const isAdmin = window.location.search.includes("admin=1");
 if(isAdmin){
-  document.querySelectorAll(".admin").forEach(b => b.style.display="inline-block");
+  document.querySelectorAll(".admin").forEach(b=>b.style.display="inline-block");
 }
 
 // Tabelle bauen
 const body = document.getElementById("body");
 
-faecher.forEach(f => {
-  const row = document.createElement("tr");
+faecher.forEach(f=>{
+  const row=document.createElement("tr");
 
   row.innerHTML = `
     <td>${f}</td>
-    ${"<td contenteditable='true'></td>".repeat(8)}
-    <td class="result">0</td>
+    ${"<td contenteditable='true'></td>".repeat(15)}
+    <td>0</td>
   `;
 
   body.appendChild(row);
 });
 
-// Notenberechnung
+// Rechner
 function calc(row){
-  const cells = row.querySelectorAll("td");
+  const c=row.querySelectorAll("td");
+  const g=i=>parseFloat(c[i].innerText)||0;
 
-  let values = [];
+  let s1=(g(1)+g(2)+g(3)+g(4)+g(5))/5;
+  let m1=g(6);
+  let hj1=(s1+m1)/2;
 
-  for(let i=1;i<=8;i++){
-    let v = parseFloat(cells[i].innerText);
-    if(!isNaN(v)) values.push(v);
-  }
+  let s2=(g(8)+g(9)+g(10)+g(11)+g(12))/5;
+  let m2=g(13);
+  let hj2=(s2+m2)/2;
 
-  let schrift = values.length
-    ? values.reduce((a,b)=>a+b)/values.length
-    : 0;
+  let ges=(hj1+hj2)/2;
 
-  let muendlich = parseFloat(cells[8].innerText) || 0;
-
-  let fach = cells[0].innerText;
-
-  const fiftyFifty = [
-    "Gemeinschaftskunde","Wirtschaft","Kunst","Biologie","Geographie","Musik"
-  ];
-
-  let end;
-
-  if(fiftyFifty.includes(fach)){
-    end = (schrift + muendlich) / 2;
-  } else {
-    end = schrift * 0.6 + muendlich * 0.4;
-  }
-
-  cells[9].innerText = end.toFixed(2);
+  c[7].innerText=hj1.toFixed(2);
+  c[14].innerText=hj2.toFixed(2);
+  c[15].innerText=ges.toFixed(2);
 }
 
-// Live Update
-document.addEventListener("input", () => {
+// live
+document.addEventListener("input",()=>{
   document.querySelectorAll("tbody tr").forEach(calc);
 });
 
-// Speichern
+// speichern
 async function saveData(){
-  const data = [];
+  let data=[];
 
-  document.querySelectorAll("tbody tr").forEach(row => {
-    const cells = row.querySelectorAll("td");
+  document.querySelectorAll("tbody tr").forEach(r=>{
+    let c=r.querySelectorAll("td");
 
     data.push({
-      subject: cells[0].innerText,
-      values: Array.from({length:8}).map((_,i) => cells[i+1].innerText)
+      subject:c[0].innerText,
+      values:Array.from({length:15}).map((_,i)=>c[i+1].innerText)
     });
   });
 
-  await fetch(scriptURL, {
-    method: "POST",
-    body: JSON.stringify(data)
+  await fetch(scriptURL,{
+    method:"POST",
+    body:JSON.stringify(data)
   });
 
   alert("Gespeichert 🚀");
 }
 
-// Laden
-window.onload = async () => {
-  const res = await fetch(scriptURL);
-  const data = await res.json();
+// laden
+window.onload=async()=>{
+  const res=await fetch(scriptURL);
+  const data=await res.json();
 
-  const rows = document.querySelectorAll("tbody tr");
+  const rows=document.querySelectorAll("tbody tr");
 
-  data.forEach((rowData, i) => {
+  data.forEach((d,i)=>{
     if(!rows[i]) return;
 
-    const cells = rows[i].querySelectorAll("td");
+    const c=rows[i].querySelectorAll("td");
 
-    rowData.values.forEach((val, j) => {
-      cells[j+1].innerText = val || "";
+    d.values.forEach((v,j)=>{
+      c[j+1].innerText=v||"";
     });
 
     calc(rows[i]);
