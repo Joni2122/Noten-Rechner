@@ -2,205 +2,194 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Noten System</title>
+<title>Noten App</title>
 
 <style>
-body{
-  margin:0;
+body {
   font-family: Arial;
-  background:#0b1220;
-  color:white;
-  padding:20px;
+  background: #0f0f0f;
+  color: white;
+  margin: 0;
 }
 
-h1{
-  text-align:center;
-  color:#38bdf8;
+h1 {
+  text-align: center;
+  padding: 20px;
 }
 
-table{
-  width:100%;
-  border-collapse:collapse;
-  background:#1e293b;
-  border-radius:10px;
-  overflow:hidden;
+table {
+  width: 95%;
+  margin: auto;
+  border-collapse: collapse;
 }
 
-th,td{
-  border:1px solid #334155;
-  padding:6px;
-  text-align:center;
+th, td {
+  border: 1px solid #333;
+  padding: 8px;
+  text-align: center;
 }
 
-th{
-  background:#0ea5e9;
+th {
+  background: #222;
 }
 
-input{
-  width:55px;
-  background:#0f172a;
-  color:white;
-  border:1px solid #334155;
-  border-radius:6px;
-  text-align:center;
+td[contenteditable="true"] {
+  background: #1e1e1e;
 }
 
-.avg{
-  font-weight:bold;
-  color:#38bdf8;
+button {
+  margin: 10px;
+  padding: 10px;
+  cursor: pointer;
+  border: none;
+  background: #2d2d2d;
+  color: white;
+}
+
+button:hover {
+  background: #444;
+}
+
+.admin {
+  display: none;
 }
 </style>
 </head>
 
 <body>
 
-<h1>📚 Noten System</h1>
+<h1>📊 Noten Übersicht</h1>
+
+<button onclick="saveData()" class="admin">💾 Speichern</button>
 
 <table>
-<thead>
-<tr>
-  <th>Fach</th>
-  <th>KA1</th>
-  <th>KA2</th>
-  <th>KA3</th>
-  <th>T1</th>
-  <th>T2</th>
-  <th>Mündlich</th>
-  <th>Ø HJ1</th>
+  <thead>
+    <tr>
+      <th>Fach</th>
+      <th>KA1</th>
+      <th>KA2</th>
+      <th>KA3</th>
+      <th>Test1</th>
+      <th>Test2</th>
+      <th>Test3</th>
+      <th>Test4</th>
+      <th>Mündlich</th>
+      <th>Endnote</th>
+    </tr>
+  </thead>
 
-  <th>KA1</th>
-  <th>KA2</th>
-  <th>KA3</th>
-  <th>T1</th>
-  <th>T2</th>
-  <th>Mündlich</th>
-  <th>Ø HJ2</th>
-
-  <th>Gesamt</th>
-</tr>
-</thead>
-
-<tbody id="body"></tbody>
+  <tbody id="body"></tbody>
 </table>
 
-<script type="module">
+<script>
 
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+const scriptURL = "https://script.google.com/macros/s/AKfycbzxh53UZEoaPM5BripHYSZqH9B4Z4BbtzDEQZZg9BEA9OuMK3nvJvaO3As261hBOmk/exec";
 
-const supabase = createClient(
-  "https://qrtnqwfcarwvxfljkqon.supabase.co",
-  "sb_publishable_j7O7k3fTxwF5_LzTUjrt4w_dzW1ruuv"
-);
-
-const subjects = [
-  "Mathe","Deutsch","Englisch","Französisch","NWT",
-  "Geo","Bio","Chemie","Physik","Geschichte",
-  "GK","Musik","Kunst","Reli","Sport"
+const faecher = [
+"Mathe","Deutsch","Englisch","Französisch",
+"Gemeinschaftskunde","Wirtschaft","Kunst","Biologie",
+"Geographie","Musik"
 ];
 
-let data = [];
-
-async function load(){
-  const { data: res } = await supabase.from("grades").select("*");
-  data = res || [];
-  render();
+// Admin Mode
+const isAdmin = window.location.search.includes("admin=1");
+if(isAdmin){
+  document.querySelectorAll(".admin").forEach(b => b.style.display="inline-block");
 }
 
-load();
+// Tabelle bauen
+const body = document.getElementById("body");
 
-function get(subject, semester){
-  return data.find(d => d.subject === subject && d.semester === semester) || {};
-}
+faecher.forEach(f => {
+  const row = document.createElement("tr");
 
-function calc(e){
+  row.innerHTML = `
+    <td>${f}</td>
+    ${"<td contenteditable='true'></td>".repeat(8)}
+    <td class="result">0</td>
+  `;
 
-  if(!e) return "-";
+  body.appendChild(row);
+});
 
-  let exams = [e.exam1,e.exam2,e.exam3].filter(v=>v!=null);
-  let tests = [e.test1,e.test2].filter(v=>v!=null);
+// Notenberechnung
+function calc(row){
+  const cells = row.querySelectorAll("td");
 
-  let examAvg = exams.length ? exams.reduce((a,b)=>a+b)/exams.length : null;
-  let testAvg = tests.length ? tests.reduce((a,b)=>a+b)/tests.length : null;
+  let values = [];
 
-  let sum = 0;
-  let w = 0;
-
-  if(examAvg!==null){sum+=examAvg*0.6; w+=0.6;}
-  if(testAvg!==null){sum+=testAvg*0.6; w+=0.6;}
-  if(e.oral!=null){sum+=e.oral*0.4; w+=0.4;}
-
-  return w ? (sum/w).toFixed(2) : "-";
-}
-
-async function save(subject, semester, field, value){
-
-  let entry = data.find(d => d.subject === subject && d.semester === semester);
-
-  if(!entry){
-    entry = { subject, semester };
-    data.push(entry);
+  for(let i=1;i<=8;i++){
+    let v = parseFloat(cells[i].innerText);
+    if(!isNaN(v)) values.push(v);
   }
 
-  entry[field] = value === "" ? null : parseFloat(value);
+  let schrift = values.length
+    ? values.reduce((a,b)=>a+b)/values.length
+    : 0;
 
-  await supabase.from("grades").upsert(entry, {
-    onConflict: "subject,semester"
+  let muendlich = parseFloat(cells[8].innerText) || 0;
+
+  let fach = cells[0].innerText;
+
+  const fiftyFifty = [
+    "Gemeinschaftskunde","Wirtschaft","Kunst","Biologie","Geographie","Musik"
+  ];
+
+  let end;
+
+  if(fiftyFifty.includes(fach)){
+    end = (schrift + muendlich) / 2;
+  } else {
+    end = schrift * 0.6 + muendlich * 0.4;
+  }
+
+  cells[9].innerText = end.toFixed(2);
+}
+
+// Live Update
+document.addEventListener("input", () => {
+  document.querySelectorAll("tbody tr").forEach(calc);
+});
+
+// Speichern
+async function saveData(){
+  const data = [];
+
+  document.querySelectorAll("tbody tr").forEach(row => {
+    const cells = row.querySelectorAll("td");
+
+    data.push({
+      subject: cells[0].innerText,
+      values: Array.from({length:8}).map((_,i) => cells[i+1].innerText)
+    });
   });
-}
 
-function render(){
-
-  const body = document.getElementById("body");
-  body.innerHTML = "";
-
-  subjects.forEach(sub => {
-
-    const h1 = get(sub,1);
-    const h2 = get(sub,2);
-
-    body.innerHTML += `
-      <tr>
-        <td>${sub}</td>
-
-        ${cell(sub,1,"exam1",h1.exam1)}
-        ${cell(sub,1,"exam2",h1.exam2)}
-        ${cell(sub,1,"exam3",h1.exam3)}
-        ${cell(sub,1,"test1",h1.test1)}
-        ${cell(sub,1,"test2",h1.test2)}
-        ${cell(sub,1,"oral",h1.oral)}
-        <td class="avg">${calc(h1)}</td>
-
-        ${cell(sub,2,"exam1",h2.exam1)}
-        ${cell(sub,2,"exam2",h2.exam2)}
-        ${cell(sub,2,"exam3",h2.exam3)}
-        ${cell(sub,2,"test1",h2.test1)}
-        ${cell(sub,2,"test2",h2.test2)}
-        ${cell(sub,2,"oral",h2.oral)}
-        <td class="avg">${calc(h2)}</td>
-
-        <td class="avg">${avg(calc(h1),calc(h2))}</td>
-      </tr>
-    `;
+  await fetch(scriptURL, {
+    method: "POST",
+    body: JSON.stringify(data)
   });
+
+  alert("Gespeichert 🚀");
 }
 
-function cell(subject, semester, field, value){
-  return `
-    <td>
-      <input value="${value ?? ""}"
-        onchange="update('${subject}',${semester},'${field}',this.value)">
-    </td>
-  `;
-}
+// Laden
+window.onload = async () => {
+  const res = await fetch(scriptURL);
+  const data = await res.json();
 
-function avg(a,b){
-  let arr = [parseFloat(a),parseFloat(b)].filter(x=>!isNaN(x));
-  if(!arr.length) return "-";
-  return (arr.reduce((x,y)=>x+y)/arr.length).toFixed(2);
-}
+  const rows = document.querySelectorAll("tbody tr");
 
-window.update = async function(subject, semester, field, value){
-  await save(subject, semester, field, value);
+  data.forEach((rowData, i) => {
+    if(!rows[i]) return;
+
+    const cells = rows[i].querySelectorAll("td");
+
+    rowData.values.forEach((val, j) => {
+      cells[j+1].innerText = val || "";
+    });
+
+    calc(rows[i]);
+  });
 };
 
 </script>
